@@ -12,58 +12,91 @@
 </head>
 <body>
   <header class="topbar">
-    <h1 id="monthLabel">Budget</h1>
-    <button id="whoChip" class="chip" title="Tap to switch who's logging">—</button>
+    <h1>Budget</h1>
+    <button id="whoChip" class="chip" title="Tap to switch who's logging"><span id="whoName">—</span> <span class="swap">⇄</span></button>
   </header>
 
   <main>
     <!-- DASHBOARD -->
     <section id="view-dash" class="view active">
+      <div id="pastBanner" class="banner past" hidden></div>
+
+      <div class="monthnav">
+        <button id="prevMonth" class="navbtn" aria-label="Previous month">‹</button>
+        <span id="monthLabel" class="monthlabel">…</span>
+        <button id="nextMonth" class="navbtn" aria-label="Next month">›</button>
+      </div>
+
+      <div id="overBanner" class="banner over" hidden></div>
+
       <div id="summary" class="summary"></div>
+
+      <div class="seg" role="tablist" aria-label="View">
+        <button id="segCat" class="seg-btn active" role="tab">Categories</button>
+        <button id="segPerson" class="seg-btn" role="tab">By person</button>
+      </div>
+
       <div id="cats" class="cats"></div>
+      <div id="people" class="people" hidden></div>
+
+      <h2 class="sec-title">Recent</h2>
+      <div id="recent" class="recent"></div>
+
       <p id="dashMsg" class="msg"></p>
     </section>
 
-    <!-- ADD -->
+    <!-- ADD / EDIT -->
     <section id="view-add" class="view">
+      <div id="editBanner" class="banner edit" hidden>
+        Editing transaction — <button type="button" id="cancelEdit" class="lnk">cancel</button>
+      </div>
       <form id="addForm">
         <label>Amount (R)
-          <input id="amount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required />
+          <input id="amount" type="text" inputmode="numeric" pattern="[0-9]*[.,]?[0-9]*" placeholder="0" autocomplete="off" required />
         </label>
-        <label>Category
-          <select id="category" required></select>
+
+        <div class="field">
+          <span class="field-label">Category</span>
+          <div id="catChips" class="cat-chips" role="listbox" aria-label="Category"></div>
+          <input id="category" type="hidden" />
+        </div>
+
+        <button type="button" id="toggleNote" class="disclosure">+ Add note</button>
+        <label id="noteWrap" hidden>Note
+          <input id="note" type="text" placeholder="e.g. Checkers" autocomplete="off" />
         </label>
-        <label>Note (optional)
-          <input id="note" type="text" placeholder="e.g. Checkers" />
-        </label>
-        <label>Slip photo (optional)
+
+        <button type="button" id="togglePhoto" class="disclosure">+ Attach slip</button>
+        <label id="photoWrap" hidden>Slip photo
           <input id="photo" type="file" accept="image/*" capture="environment" />
         </label>
         <img id="preview" class="preview" alt="" hidden />
-        <button id="saveBtn" type="submit">Save</button>
+
+        <button id="saveBtn" type="submit" class="savebtn">Save</button>
         <p id="addMsg" class="msg"></p>
       </form>
     </section>
 
     <!-- SETTINGS -->
     <section id="view-set" class="view">
+      <p class="hint">Setup only — fill this in once per phone. Ask Iain for the URL &amp; token.</p>
       <form id="setForm">
         <label>Apps Script Web App URL
           <input id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" required />
         </label>
         <label>Secret token
-          <input id="token" type="text" placeholder="the TOKEN from Code.gs" required />
+          <input id="token" type="password" placeholder="the TOKEN from setup" autocomplete="off" required />
         </label>
         <label>Who is this phone?
           <select id="who">
+            <option value="" disabled selected>Choose…</option>
             <option>Iain</option>
             <option>Simone</option>
           </select>
         </label>
-        <button type="submit">Save &amp; connect</button>
+        <button type="submit" class="savebtn">Save &amp; connect</button>
         <p id="setMsg" class="msg"></p>
       </form>
-      <p class="hint">Settings are stored only on this phone. Enter the same URL &amp; token on both phones.</p>
     </section>
   </main>
 
@@ -72,6 +105,8 @@
     <button data-view="add" class="fab">＋ Add</button>
     <button data-view="set">Settings</button>
   </nav>
+
+  <div id="snack" class="snack" hidden></div>
 
   <script src="app.js"></script>
 </body>

@@ -1,6 +1,6 @@
 /* Service worker: cache the app shell for offline launch.
    API calls to Google are always network (never cached). */
-var CACHE = 'budget-app-v1';
+var CACHE = 'budget-app-v2';
 var SHELL = [
   './', './index.html', './app.js', './styles.css',
   './manifest.webmanifest', './icons/icon.svg'
