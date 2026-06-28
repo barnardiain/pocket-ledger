@@ -7,11 +7,11 @@ function setSettings(s) { localStorage.setItem(SK, JSON.stringify(s)); }
 function lastCategory() { return localStorage.getItem('budgetApp.lastCategory') || ''; }
 function setLastCategory(c) { if (c) localStorage.setItem('budgetApp.lastCategory', c); }
 
-var state = null;        // last fetched server state
-var viewMonth = null;    // 'YYYY-MM' currently shown
-var serverMonth = null;  // the real current month (from server) — caps forward nav
-var dashMode = 'cat';    // 'cat' | 'person'
-var editingId = null;    // id of txn being edited, or null
+var state = null;         // last fetched server state
+var viewPeriod = null;    // pay-cycle id ('yyyy-MM-dd') currently shown; null = current
+var serverPeriod = null;  // the current cycle's id (from server)
+var dashMode = 'cat';     // 'cat' | 'person'
+var editingId = null;     // id of txn being edited, or null
 
 // ── api (all POST so the token never rides in a URL) ───────────────────────────
 function api() {
@@ -24,7 +24,7 @@ function api() {
     }).then(function (r) { return r.json(); });
   }
   return {
-    getState: function (month) { return post({ action: 'getState', month: month }); },
+    getState: function (period) { return post({ action: 'getState', period: period }); },
     add: function (tx) { return post(Object.assign({ action: 'add' }, tx)); },
     edit: function (id, tx) { return post(Object.assign({ action: 'edit', id: id }, tx)); },
     del: function (id) { return post({ action: 'delete', id: id }); }
@@ -35,9 +35,6 @@ function api() {
 function money(n) { return 'R' + Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
 function setMsg(el, text, kind) { el.textContent = text || ''; el.className = 'msg' + (kind ? ' ' + kind : ''); }
-var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-function ymLabel(ym) { var p = ym.split('-'); return MONTHS[+p[1] - 1] + ' ' + p[0]; }
-function ymAdd(ym, d) { var p = ym.split('-'); var y = +p[0], m = +p[1] + d; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return y + '-' + (m < 10 ? '0' + m : '' + m); }
 function timeAgo(iso) {
   var t = new Date(iso).getTime(); if (isNaN(t)) return '';
   var s = Math.floor((Date.now() - t) / 1000);
@@ -72,11 +69,12 @@ document.querySelectorAll('.tabbar button').forEach(function (b) {
   });
 });
 
-// month nav
-document.getElementById('prevMonth').addEventListener('click', function () { viewMonth = ymAdd(viewMonth, -1); refresh(); });
+// pay-cycle nav — the server tells us the prev/next cycle ids
+document.getElementById('prevMonth').addEventListener('click', function () {
+  if (state && state.prevPeriod) { viewPeriod = state.prevPeriod; refresh(); }
+});
 document.getElementById('nextMonth').addEventListener('click', function () {
-  if (serverMonth && viewMonth >= serverMonth) return;
-  viewMonth = ymAdd(viewMonth, 1); refresh();
+  if (state && state.nextPeriod) { viewPeriod = state.nextPeriod; refresh(); }
 });
 
 // segmented toggle
@@ -96,11 +94,11 @@ async function refresh() {
   if (!s.scriptUrl || !s.token) { renderNotConnected(); return; }
   setMsg(msg, 'Loading…');
   try {
-    var data = await api().getState(viewMonth || undefined);
+    var data = await api().getState(viewPeriod || undefined);
     if (data.error) { setMsg(msg, 'Error: ' + friendly(data.error), 'error'); return; }
     state = data;
-    serverMonth = data.serverMonth || data.month;
-    if (!viewMonth) viewMonth = data.month;
+    serverPeriod = data.serverPeriod || data.period;
+    viewPeriod = data.period;
     render(data);
     setMsg(msg, '');
   } catch (e) {
@@ -116,23 +114,21 @@ function friendly(err) {
 }
 
 function render(data) {
-  // month label + nav cap
-  document.getElementById('monthLabel').textContent = ymLabel(data.month);
-  document.getElementById('nextMonth').disabled = !!(serverMonth && data.month >= serverMonth);
+  // cycle label + nav state
+  document.getElementById('monthLabel').textContent = data.periodLabel || '';
+  document.getElementById('prevMonth').disabled = !data.prevPeriod;
+  document.getElementById('nextMonth').disabled = !data.nextPeriod;
   var past = document.getElementById('pastBanner');
-  if (serverMonth && data.month < serverMonth) { past.hidden = false; past.textContent = 'Viewing ' + ymLabel(data.month); }
+  if (data.period !== data.serverPeriod) { past.hidden = false; past.textContent = 'Viewing ' + (data.periodLabel || 'a past cycle'); }
   else past.hidden = true;
 
-  // summary + safe-to-spend
+  // summary + safe-to-spend (daysLeft is server-computed for the current cycle only)
   var leftTotal = data.totalLimit - data.totalSpent;
   var safeHtml = '';
-  if (data.month === serverMonth) {
-    var now = new Date();
-    var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    var daysLeft = Math.max(1, daysInMonth - now.getDate() + 1);
+  if (data.daysLeft != null) {
     if (leftTotal > 0) {
-      var perDay = leftTotal / daysLeft;
-      safeHtml = '<div class="safe' + (perDay < 100 ? ' tight' : '') + '">≈ ' + money(perDay) + '/day safe · ' + daysLeft + ' day' + (daysLeft > 1 ? 's' : '') + ' left</div>';
+      var perDay = leftTotal / data.daysLeft;
+      safeHtml = '<div class="safe' + (perDay < 100 ? ' tight' : '') + '">≈ ' + money(perDay) + '/day safe · ' + data.daysLeft + ' day' + (data.daysLeft > 1 ? 's' : '') + ' left</div>';
     } else {
       safeHtml = '<div class="safe over">Over budget — R0/day left</div>';
     }
@@ -176,7 +172,7 @@ function renderPeople(data) {
   var bp = data.byPerson || {};
   var names = Object.keys(bp).sort(function (a, b) { return bp[b] - bp[a]; });
   var el = document.getElementById('people');
-  if (!names.length) { el.innerHTML = '<p class="empty">No spend logged this month.</p>'; return; }
+  if (!names.length) { el.innerHTML = '<p class="empty">No spend logged this cycle.</p>'; return; }
   el.innerHTML = names.map(function (who) {
     var lines = data.categories.filter(function (c) { return c.byPerson && c.byPerson[who]; })
       .sort(function (a, b) { return b.byPerson[who] - a.byPerson[who]; })
@@ -191,7 +187,7 @@ function renderPeople(data) {
 function renderRecent(data) {
   var list = data.recent || [];
   var el = document.getElementById('recent');
-  if (!list.length) { el.innerHTML = '<p class="empty">No transactions yet this month.</p>'; return; }
+  if (!list.length) { el.innerHTML = '<p class="empty">No transactions yet this cycle.</p>'; return; }
   el.innerHTML = list.map(function (t) {
     var who = String(t.who || '');
     var meta = (who ? esc(who) + ' · ' : '') + timeAgo(t.ts) + (t.photo_url ? ' · 📎' : '') + (t.note ? ' · ' + esc(t.note) : '');
@@ -392,7 +388,7 @@ document.getElementById('setForm').addEventListener('submit', async function (e)
   try {
     var data = await api().getState();
     if (data && data.ok) {
-      state = data; serverMonth = data.serverMonth || data.month; viewMonth = data.month;
+      state = data; serverPeriod = data.serverPeriod || data.period; viewPeriod = data.period;
       setMsg(msg, 'Connected ✓', 'success');
       setTimeout(function () { show('dash'); }, 700);
     } else {
