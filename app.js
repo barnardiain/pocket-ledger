@@ -226,8 +226,10 @@ function renderNotConnected() {
 function buildCatChips(categories) {
   var wrap = document.getElementById('catChips');
   var current = document.getElementById('category').value;
-  wrap.innerHTML = categories.map(function (c) {
-    return '<button type="button" class="' + (c.category === current ? 'selected' : '') + '" data-cat="' + esc(c.category) + '">' + esc(c.category) + '</button>';
+  var names = categories.map(function (c) { return c.category; });
+  if (names.indexOf('Uncategorised') < 0) names.push('Uncategorised'); // always available as a catch-all
+  wrap.innerHTML = names.map(function (name) {
+    return '<button type="button" class="' + (name === current ? 'selected' : '') + '" data-cat="' + esc(name) + '">' + esc(name) + '</button>';
   }).join('');
   wrap.querySelectorAll('button').forEach(function (b) {
     b.addEventListener('click', function () { selectCat(b.getAttribute('data-cat')); });
